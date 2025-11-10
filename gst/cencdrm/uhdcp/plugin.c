@@ -31,7 +31,7 @@ gboolean
 plugin_init (GstPlugin * plugin)
 {
   if (!gst_element_register (plugin, "cencdrmuhdcp",
-          GST_RANK_PRIMARY, gst_cencdrm_uhdcp_get_type ()))
+          GST_RANK_MARGINAL, gst_cencdrm_uhdcp_get_type ()))
     return FALSE;
 
   return TRUE;

@@ -31,7 +31,7 @@ gboolean
 plugin_init (GstPlugin * plugin)
 {
   if (!gst_element_register (plugin, "cencdrmplayready",
-          GST_RANK_PRIMARY, gst_cencdrm_playready_get_type ()))
+          GST_RANK_SECONDARY, gst_cencdrm_playready_get_type ()))
     return FALSE;
 
   return TRUE;

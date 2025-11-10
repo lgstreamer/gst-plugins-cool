@@ -82,7 +82,7 @@ static gboolean gst_cencdrm_playready_set_iv (GstBaseDrm * basedrm,
 static gboolean gst_cencdrm_playready_decrypt (GstBaseDrm * basedrm,
     GstDecryptInfo * decryptInfo);
 static gboolean gst_cencdrm_playready_resolve_custom_pssi (GstBaseDrm * basedrm,
-    gchar * custom_pssi, guint8 ** header, guint * size);
+    gchar * custom_pssi, guint8 ** header, guint * size, gboolean * ignore);
 static GstBuffer *gst_cencdrm_playready_get_key_info (GstBaseDrm * basedrm);
 static gboolean gst_cencdrm_playready_stop (GstBaseDrm * basedrm);
 
@@ -413,7 +413,6 @@ gst_cencdrm_playready_bind_license (GstBaseDrm * basedrm)
 {
   GstCencDrmPlayready *self = GST_CENCDRM_PLAYREADY (basedrm);
   GstDRMSystemInfo *drm_system_info = &basedrm->drm_system_info;
-  GstDRMRightsErrorInfo *rights_error_info = &basedrm->rights_error_info;
 
   DRM_RESULT dr = DRM_SUCCESS;
   DRM_APP_CONTEXT *app_context = (DRM_APP_CONTEXT *) self->app_context;
@@ -449,23 +448,6 @@ gst_cencdrm_playready_bind_license (GstBaseDrm * basedrm)
   self->license = PLAYREADY_LICENSE_GRANTED;
 
 ErrorExit:
-  switch (dr) {
-    case DRM_E_LICENSE_NOT_FOUND:
-    case DRM_E_UPLINK_LICENSE_NOT_FOUND:
-      rights_error_info->error_state = RIGHTS_ERROR_NO_LICENSE;
-      break;
-    case DRM_E_INVALID_LICENSE:
-    case DRM_E_LICENSE_EXPIRED:
-    case DRM_E_CH_BAD_KEY:
-    case DRM_E_LIC_KEY_DECODE_FAILURE:
-    case DRM_E_CONDITION_NOT_SUPPORTED:
-    case DRM_E_V1_LICENSE_CHAIN_NOT_SUPPORTED:
-      rights_error_info->error_state = RIGHTS_ERROR_INVALID_LICENSE;
-      break;
-    default:
-      rights_error_info->error_state = RIGHTS_ERROR_NONE;
-      break;
-  }
   return DRM_SUCCEEDED (dr);
 }
 
@@ -474,12 +456,9 @@ gst_cencdrm_playready_prepare_decrypt (GstBaseDrm * basedrm)
 {
   GstCencDrmPlayready *self = GST_CENCDRM_PLAYREADY (basedrm);
 
-  GST_DEBUG_OBJECT (self, "prepare decrypt");
-  if (!gst_cencdrm_playready_bind_license (basedrm)) {
-    GST_ERROR_OBJECT (self, "failed to bind license");
-    return FALSE;
-  }
-  return TRUE;
+  GST_TRACE_OBJECT (self, "prepare decrypt");
+
+  return ((self->license == PLAYREADY_LICENSE_GRANTED) ? TRUE : FALSE);
 }
 
 static gboolean
@@ -513,7 +492,6 @@ gst_cencdrm_playready_decrypt (GstBaseDrm * basedrm,
     GstDecryptInfo * decrypt_info)
 {
   GstCencDrmPlayready *self = GST_CENCDRM_PLAYREADY (basedrm);
-  GstDRMSystemInfo *drm_system_info = &basedrm->drm_system_info;
   DRM_DWORD encrypted_region_counts = decrypt_info->subsample_count;
   guint8 *iv_data;
   gsize iv_size;
@@ -579,7 +557,7 @@ gst_cencdrm_playready_get_xml_node_content (GstCencDrmPlayready * self,
 
 static gboolean
 gst_cencdrm_playready_resolve_custom_pssi (GstBaseDrm * basedrm,
-    gchar * custom_pssi, guint8 ** header, guint * size)
+    gchar * custom_pssi, guint8 ** header, guint * size, gboolean * ignore)
 {
   GstCencDrmPlayready *self = GST_CENCDRM_PLAYREADY (basedrm);
   xmlDocPtr doc;
@@ -600,6 +578,8 @@ gst_cencdrm_playready_resolve_custom_pssi (GstBaseDrm * basedrm,
   if (root_element->type != XML_ELEMENT_NODE
       || xmlStrcmp (root_element->name, (xmlChar *) "mspr:pro") != 0) {
     GST_ERROR_OBJECT (self, "Failed to find mspr:pro element");
+    *ignore = TRUE;
+    ret = TRUE;
     goto beach;
   }
 
@@ -619,6 +599,7 @@ gst_cencdrm_playready_resolve_custom_pssi (GstBaseDrm * basedrm,
     goto beach;
   }
 
+  *ignore = FALSE;
   ret = TRUE;
 
 beach:
@@ -652,9 +633,9 @@ gst_cencdrm_playready_check_key_rotation (GstCencDrmPlayready * self,
   GBytes *kid_bytes = NULL;
 
   DRM_RESULT dr = DRM_SUCCESS;
-  DRM_DWORD header_size = 0;
-  DRM_BYTE header_data[MINIMUM_APPCONTEXT_OPAQUE_BUFFER_SIZE] = { 0, };
-  DRM_DWORD header_data_size = MINIMUM_APPCONTEXT_OPAQUE_BUFFER_SIZE;
+  DRM_BYTE *header_data = NULL;
+  DRM_DWORD header_data_size = 0;
+  DRM_DWORD wchar_count = 0;
   DRM_CONST_STRING dstr_content_header = DRM_EMPTY_DRM_STRING;
   DRM_CONST_STRING dstr_kid = DRM_EMPTY_DRM_STRING;
   DRM_KID decoded_kid = DRM_ID_EMPTY;
@@ -663,30 +644,34 @@ gst_cencdrm_playready_check_key_rotation (GstCencDrmPlayready * self,
   ChkArg (header && size && key_rotation);
   *key_rotation = FALSE;
 
-  /* The header is Unicode, therefore its size must be even */
-  ChkBOOL (size % sizeof (DRM_WCHAR) == 0, DRM_E_CH_INVALID_HEADER);
+  /* Try to check input is PRO and get WRMHEADER */
+  dr = DRM_PRO_GetRecord (header, size, PLAYREADY_WRMHEADER,
+      &header_data, &header_data_size);
+  /* If it's not PRO, try to get WRMHEADER from input buffer */
+  if (DRM_FAILED (dr)) {
+    /* The header is Unicode, therefore its size must be even */
+    ChkBOOL (size % sizeof (DRM_WCHAR) == 0, DRM_E_CH_INVALID_HEADER);
 
-  /* Make sure that there is enough data to process BOM (byte order mark). */
-  ChkBOOL (size > 2, DRM_E_CH_INVALID_HEADER);
+    /* Make sure that there is enough data to process BOM (byte order mark). */
+    ChkBOOL (size > 2, DRM_E_CH_INVALID_HEADER);
 
-  /* Have to fail if first 2 8-bit units indicates big endian BOM (byte order mark). */
-  /* PK accepts input in little endian format only. */
-  ChkBOOL (!IS_BIG_ENDIAN_UTF16_BOM (header), DRM_E_CH_INVALID_HEADER);
+    /* Have to fail if first 2 8-bit units indicates big endian BOM (byte order mark). */
+    /* PK accepts input in little endian format only. */
+    ChkBOOL (!IS_BIG_ENDIAN_UTF16_BOM (header), DRM_E_CH_INVALID_HEADER);
 
-  /* Check if first 2 8-bit units are little endian BOM (byte order mark) */
-  if (IS_LITTLE_ENDIAN_UTF16_BOM (header)) {
-    /* Copy header without UTF-16 BOM. */
-    DRM_BYT_CopyBytes (header_data, 0, header, sizeof (DRM_WCHAR),
-        size - sizeof (DRM_WCHAR));
-    header_data_size = size - sizeof (DRM_WCHAR);
-  } else {
-    memcpy (header_data, header, size);
-    header_data_size = size;
+    /* Check if first 2 8-bit units are little endian BOM (byte order mark) */
+    if (IS_LITTLE_ENDIAN_UTF16_BOM (header)) {
+      /* Point to header without UTF-16 BOM. */
+      header_data = header + sizeof (DRM_WCHAR);
+      header_data_size = size - sizeof (DRM_WCHAR);
+    } else {
+      header_data = header;
+      header_data_size = size;
+    }
   }
 
-  header_size = header_data_size / sizeof (DRM_WCHAR);
-
-  if (((DRM_WCHAR *) (header_data))[header_size - 1] == DRM_WCHAR_CAST ('\0')) {
+  wchar_count = header_data_size / sizeof (DRM_WCHAR);
+  if (((DRM_WCHAR *) (header_data))[wchar_count - 1] == DRM_WCHAR_CAST ('\0')) {
     /* Remove the NULL terminating character if it is there. */
     header_data_size -= sizeof (DRM_WCHAR);
   }
@@ -694,15 +679,18 @@ gst_cencdrm_playready_check_key_rotation (GstCencDrmPlayready * self,
   DRM_DSTR_FROM_PB (&dstr_content_header, header_data, header_data_size);
   ChkDR (DRM_HDR_GetAttribute (&dstr_content_header, NULL,
           DRM_HEADER_ATTRIB_KID, &dstr_kid, NULL, NULL, 0));
-  ChkDR (DRM_B64_DecodeW (&dstr_kid, &decoded_kid_size, &decoded_kid, 0));
+  ChkDR (DRM_B64_DecodeW (&dstr_kid, &decoded_kid_size,
+          (DRM_BYTE *) & decoded_kid, 0));
 
   if (!self->kid_history) {
     self->kid_history = g_bytes_new (decoded_kid.rgb, sizeof (decoded_kid));
+    GST_DEBUG_OBJECT (self, "we got the new kid");
     goto ErrorExit;
   }
 
   kid_bytes = g_bytes_new (decoded_kid.rgb, sizeof (decoded_kid));
   if (g_bytes_equal (kid_bytes, self->kid_history)) {
+    GST_DEBUG_OBJECT (self, "no key rotation");
     goto ErrorExit;
   }
 
@@ -850,6 +838,7 @@ gst_cencdrm_playready_store_license (GstBaseDrm * basedrm,
     GstDRMLicenseInfo * drm_license_info)
 {
   GstCencDrmPlayready *self = GST_CENCDRM_PLAYREADY (basedrm);
+  GstDRMRightsErrorInfo *rights_error_info = &basedrm->rights_error_info;
 
   DRM_RESULT dr = DRM_SUCCESS;
   DRM_APP_CONTEXT *app_context = (DRM_APP_CONTEXT *) self->app_context;
@@ -861,6 +850,13 @@ gst_cencdrm_playready_store_license (GstBaseDrm * basedrm,
           DRM_PROCESS_LIC_RESPONSE_SIGNATURE_NOT_REQUIRED,
           drm_license_info->response, drm_license_info->response_length,
           &response));
+  ChkDR (response.m_dwResult);
+
+  if (!gst_cencdrm_playready_bind_license (basedrm)) {
+    GST_ERROR_OBJECT (self, "failed to bind license");
+    rights_error_info->error_state = RIGHTS_ERROR_INVALID_LICENSE;
+    return FALSE;
+  }
 
 ErrorExit:
   return DRM_SUCCEEDED (dr);

@@ -2667,7 +2667,11 @@ gst_dash_demux_advance_period (GstAdaptiveDemux * demux)
   }
 
   gst_dash_demux_setup_all_streams (dashdemux);
-  gst_mpd_client_seek_to_first_segment (dashdemux->client);
+  if (demux->segment.rate >= 0) {
+    gst_mpd_client_seek_to_first_segment (dashdemux->client);
+  } else {
+    gst_mpd_client_seek_to_last_segment (dashdemux->client);
+  }
 }
 
 static GstBuffer *

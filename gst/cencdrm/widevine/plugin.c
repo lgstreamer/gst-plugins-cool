@@ -25,13 +25,13 @@
 
 #include <gst/basedrm/gstbasedrm.h>
 
-#include "gstcencdrmmarlin.h"
+#include "gstcencdrmwidevine.h"
 
 gboolean
 plugin_init (GstPlugin * plugin)
 {
-  if (!gst_element_register (plugin, "cencdrmmarlin",
-          GST_RANK_SECONDARY, gst_cencdrm_marlin_get_type ()))
+  if (!gst_element_register (plugin, "cencdrmwidevine",
+          GST_RANK_MARGINAL, gst_cencdrm_widevine_get_type ()))
     return FALSE;
 
   return TRUE;
@@ -39,6 +39,6 @@ plugin_init (GstPlugin * plugin)
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    cencdrmmarlin,
-    "Decrypts Marlin DRM protected media in ISOBMFF CENC format",
+    cencdrmwidevine,
+    "Decrypts Widevine DRM protected media in ISOBMFF CENC format",
     plugin_init, VERSION, "LGPL", GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN);

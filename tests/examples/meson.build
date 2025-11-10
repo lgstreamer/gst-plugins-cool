@@ -1,0 +1,7 @@
+subdir('decproxy')
+subdir('dynappsrc')
+subdir('mediainfo')
+subdir('mpegts')
+subdir('rm')
+subdir('splitappsink')
+subdir('textbin')

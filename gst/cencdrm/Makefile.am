@@ -4,5 +4,11 @@ else
 PLAYREADY_DIR=
 endif
 
-SUBDIRS = marlin $(PLAYREADY_DIR) uhdcp
-DIS_SUBDIRS = marlin $(PLAYREADY_DIR) uhdcp
+if USE_WIDEVINE
+WIDEVINE_DIR=widevine
+else
+WIDEVINE_DIR=
+endif
+
+SUBDIRS = marlin $(PLAYREADY_DIR) uhdcp $(WIDEVINE_DIR)
+DIS_SUBDIRS = marlin $(PLAYREADY_DIR) uhdcp $(WIDEVINE_DIR)

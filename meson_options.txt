@@ -1,5 +1,6 @@
 option('use_playready', type : 'combo', choices : ['yes', 'no', 'auto'], value : 'yes')
 option('use_orc', type : 'combo', choices : ['yes', 'no', 'auto'], value : 'auto')
+option('disable_examples', type : 'boolean', value : true)
 option('disable_introspection',
         type : 'boolean', value : false,
         description : 'Whether to disable the introspection generation')

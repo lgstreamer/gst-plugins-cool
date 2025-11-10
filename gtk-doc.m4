@@ -1,0 +1,1 @@
+C:/Users/nil/AppData/Local/Temp/7zE08B2B4F2/home/shkim81/work/o20/jebil/15/build-starfish/BUILD/work/o20-starfishmllib32-linux-gnueabi/lib32-gstreamer1.0-plugins-cool/1.14.4-1144.jcl4tvmr.17-r15/recipe-sysroot-native/usr/share/aclocal/gtk-doc.m4

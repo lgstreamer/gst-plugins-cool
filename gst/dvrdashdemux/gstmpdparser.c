@@ -5958,6 +5958,29 @@ gst_mpd_client_seek_to_first_segment (GstMpdClient * client)
   }
 }
 
+void
+gst_mpd_client_seek_to_last_segment (GstMpdClient * client)
+{
+  GList *list;
+
+  g_return_if_fail (client != NULL);
+  g_return_if_fail (client->active_streams != NULL);
+
+  for (list = g_list_first (client->active_streams); list;
+      list = g_list_next (list)) {
+    GstActiveStream *stream = (GstActiveStream *) list->data;
+    if (stream) {
+      guint segments_count = gst_mpd_client_get_segments_counts (client, stream);
+      if (segments_count > 1) {
+        stream->segment_index = segments_count - 1;
+      } else {
+        stream->segment_index = 0;
+      }
+      stream->segment_repeat_index = 0;
+    }
+  }
+}
+
 static guint
 gst_mpd_client_get_segments_counts (GstMpdClient * client,
     GstActiveStream * stream)

@@ -22,6 +22,12 @@ GSTPB_REQUIRED=1.0.0
 dnl required versions of playready-4.0
 PLAYREADY_REQUIRED=4.0.5102
 
+dnl required version of Widevine
+WIDEVINE_REQUIRED=1.0.0
+
+dnl required version of dtcp2-usb
+DTCP2USB_REQUIRED=2.6.4
+
 dnl can autoconf find the source ?
 AC_CONFIG_SRCDIR([gst/decproxy/gstdecproxy2.c])
 
@@ -152,6 +158,12 @@ AG_GST_CHECK_FEATURE(LIBXML2, [dash sink plugin (2.4)], dashsink, [
   AC_SUBST(LIBXML2_LIBS)
 ])
 
+AG_GST_CHECK_FEATURE(JSONC, [json-c], json-c, [
+  PKG_CHECK_MODULES(JSONC, json-c, [HAVE_JSONC="yes"], [HAVE_JSONC="no"])
+  AC_SUBST(JSONC_CFLAGS)
+  AC_SUBST(JSONC_LIBS)
+])
+
 dnl Check for documentation xrefs
 GLIB_PREFIX="`$PKG_CONFIG --variable=prefix glib-2.0`"
 GST_PREFIX="`$PKG_CONFIG --variable=prefix gstreamer-$GST_API_VERSION`"
@@ -169,6 +181,7 @@ AG_GST_CHECK_PLUGIN(fakedec)
 AG_GST_CHECK_PLUGIN(dolbystreamcombiner)
 AG_GST_CHECK_PLUGIN(dvcombbin)
 AG_GST_CHECK_PLUGIN(cencdrm)
+AG_GST_CHECK_PLUGIN(dtcp)
 AG_GST_CHECK_PLUGIN(cooltracer)
 AG_GST_CHECK_PLUGIN(splitappsink)
 AG_GST_CHECK_PLUGIN(dvrdrm)
@@ -336,7 +349,7 @@ AC_SUBST(TMPDIR)
 
 AC_MSG_NOTICE([Using ${MACHINE} as a target])
 case "${MACHINE}" in
-  h15|k2h|k2l|lm15u|m14tv|mtka5lr|rtks2b|m16|m2|m16p|m2r|k3l|k3lp|k4lp|m16pp|o18|m3|lm18a|k5lp|k5ap|m3r|m16p3|lm19a|o20|o208k|lm20a|lm20u|k6lp|k6hp)
+  h15|k2h|k2l|lm15u|m14tv|mtka5lr|rtks2b|m16|m2|m16p|m2r|k3l|k3lp|k4lp|m16pp|o18|m3|lm18a|k5lp|k5ap|m3r|m16p3|lm19a|o20|o208k|lm20a|lm20u|k6lp|k6hp|e60|k6lpfhd|k6lpwee)
     HAVE_MACHINE=yes
     ;;
   qemux86)
@@ -361,6 +374,26 @@ AG_GST_CHECK_FEATURE(PLAYREADY, [PLAYREADY plug-in], playready, [
     HAVE_PLAYREADY="no"])
   AC_SUBST(PLAYREADY_CFLAGS)
   AC_SUBST(PLAYRADY_LIBS)
+])
+
+dnl check for widevine
+translit(dnm, m, l) AM_CONDITIONAL(USE_WIDEVINE, true)
+AG_GST_CHECK_FEATURE(WIDEVINE, [WIDEVINE plug-in], widevine, [
+  PKG_CHECK_MODULES(WIDEVINE, widevine >= $WIDEVINE_REQUIRED, [
+    HAVE_WIDEVINE="yes"], [
+    HAVE_WIDEVINE="no"])
+  AC_SUBST(WIDEVINE_CFLAGS)
+  AC_SUBST(WIDEVINE_LIBS)
+])
+
+dnl check for dtcp2-usb
+translit(dnm, m, l) AM_CONDITIONAL(USE_DTCP2USB, true)
+AG_GST_CHECK_FEATURE(DTCP2USB, [DTCP2USB plug-in], dtcp2usb, [
+  PKG_CHECK_MODULES(DTCP2USB, dtcp2-usb >= $DTCP2USB_REQUIRED, [
+    HAVE_DTCP2USB="yes"], [
+    HAVE_DTCP2USB="no"])
+  AC_SUBST(DTCP2USB_CFLAGS)
+  AC_SUBST(DTCP2USB_LIBS)
 ])
 
 AM_CONDITIONAL([HAVE_MACHINE], [test "x${HAVE_MACHINE}" = "xyes"])
@@ -390,6 +423,9 @@ AM_CONDITIONAL([PLATFORM_LM20A], [test "x${MACHINE}" = "xlm20a"])
 AM_CONDITIONAL([PLATFORM_LM20U], [test "x${MACHINE}" = "xlm20u"])
 AM_CONDITIONAL([PLATFORM_K6LP], [test "x${MACHINE}" = "xk6lp"])
 AM_CONDITIONAL([PLATFORM_K6HP], [test "x${MACHINE}" = "xk6hp"])
+AM_CONDITIONAL([PLATFORM_E60], [test "x${MACHINE}" = "xe60"])
+AM_CONDITIONAL([PLATFORM_K6LPFHD], [test "x${MACHINE}" = "xk6lpfhd"])
+AM_CONDITIONAL([PLATFORM_K6LPWEE], [test "x${MACHINE}" = "xk6lpwee"])
 
 AC_CONFIG_FILES(
 Makefile
@@ -411,6 +447,9 @@ gst/cencdrm/Makefile
 gst/cencdrm/marlin/Makefile
 gst/cencdrm/playready/Makefile
 gst/cencdrm/uhdcp/Makefile
+gst/cencdrm/widevine/Makefile
+gst/dtcp/Makefile
+gst/dtcp/dtcp2usb/Makefile
 gst/dvrdrm/Makefile
 gst/cooltracer/Makefile
 gst/splitappsink/Makefile

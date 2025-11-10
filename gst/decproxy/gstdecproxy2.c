@@ -169,6 +169,7 @@ pad_linked (GstPad * pad, GstPad * peer, gpointer user_data)
         "has 'use-stream-collection' field: %d, returned value: %d",
         gst_structure_has_field (smart_properties, "use-stream-collection"),
         decproxy->use_stream_collection);
+    gst_structure_free (smart_properties);
   } else {
     GstSmartPropertiesReturn ret =
         gst_element_get_smart_properties (GST_ELEMENT_CAST (decproxy),
@@ -879,8 +880,8 @@ gst_decproxy_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
 
       guint64 ts =
           (decproxy->stream_type ==
-          GST_COOL_STREAM_TYPE_VIDEO ? decproxy->vdec_buf_ts : decproxy->
-          adec_buf_ts);
+          GST_COOL_STREAM_TYPE_VIDEO ? decproxy->
+          vdec_buf_ts : decproxy->adec_buf_ts);
 
       g_value_init (&value, G_TYPE_UINT64);
       g_value_set_uint64 (&value, ts);
@@ -1698,29 +1699,39 @@ reconfigure_decoder (GstDecProxy * decproxy, GstElement * decoder)
 
   if (decproxy->next_decoder_state == GST_DECPROXY_STATE_DECODER
       && decproxy->has_secure_area) {
-    guint vdec_handle = 0;
-    GstPad *pad = NULL;
-    GstCaps *caps = NULL;
+    if (decproxy->use_external_dec) {
+      GST_DEBUG_OBJECT (decproxy, "make dtcp2usb in decproxy");
+      g_free (decproxy->has_secure_area);
+      decproxy->has_secure_area = g_strdup ("dtcp2usb");
+    }
+
     decproxy->secure =
         gst_element_factory_make (decproxy->has_secure_area, NULL);
     gst_bin_add ((GstBin *) decproxy, decproxy->secure);
     gst_element_sync_state_with_parent (decproxy->secure);
-    pad = gst_element_get_static_pad (decproxy->front, "src");
-    caps = gst_pad_get_current_caps (pad);
-    if (caps == NULL)
-      caps = gst_pad_query_caps (pad, NULL);
-    g_signal_emit_by_name (decoder, "acquire-vdec-handle", TRUE, caps,
-        &vdec_handle);
-    gst_object_unref (pad);
-    gst_caps_unref (caps);
 
-    if (vdec_handle) {
-      GST_DEBUG_OBJECT (decproxy->secure, "deliver vdec-handle");
-      g_object_set (decproxy->secure, "vdec-handle", vdec_handle, NULL);
-    } else
-      GST_WARNING_OBJECT (decoder, "Failed to get vdec-handle");
+    if (!g_strcmp0 (decproxy->has_secure_area, "svp")) {
+      guint vdec_handle = 0;
+      GstPad *pad = NULL;
+      GstCaps *caps = NULL;
+      pad = gst_element_get_static_pad (decproxy->front, "src");
+      caps = gst_pad_get_current_caps (pad);
+      if (caps == NULL)
+        caps = gst_pad_query_caps (pad, NULL);
+      g_signal_emit_by_name (decoder, "acquire-vdec-handle", TRUE, caps,
+          &vdec_handle);
+      gst_object_unref (pad);
+      gst_caps_unref (caps);
 
-    GST_DEBUG_OBJECT (decproxy, "Link svp and decoder");
+      if (vdec_handle) {
+        GST_DEBUG_OBJECT (decproxy->secure, "deliver vdec-handle");
+        g_object_set (decproxy->secure, "vdec-handle", vdec_handle, NULL);
+      } else
+        GST_WARNING_OBJECT (decoder, "Failed to get vdec-handle");
+    }
+
+    GST_DEBUG_OBJECT (decproxy, "Link %s and decoder",
+        decproxy->has_secure_area);
     gst_element_link_many (decproxy->front, decproxy->secure, decoder,
         decproxy->back, NULL);
   } else {

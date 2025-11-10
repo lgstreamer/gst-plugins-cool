@@ -357,7 +357,8 @@ static gboolean
 gst_cencdrm_marlin_decrypt (GstBaseDrm * basedrm, GstDecryptInfo * decrypt_info)
 {
   GstCencDrmMarlin *self = GST_CENCDRM_MARLIN (basedrm);
-  guint8 *iv_data = NULL;
+  guint8 iv_data[16] = { 0 };
+  guint8 *data = NULL;
   guint8 *kid_data = NULL;
   gsize iv_size, kid_size;
   guint64 iv = 0;
@@ -368,11 +369,11 @@ gst_cencdrm_marlin_decrypt (GstBaseDrm * basedrm, GstDecryptInfo * decrypt_info)
 
   GST_DEBUG_OBJECT (self, "decrypt");
 
-  iv_data = (guint8 *) g_bytes_get_data (self->iv_bytes, &iv_size);
   kid_data = (guint8 *) g_bytes_get_data (self->kid_bytes, &kid_size);
-
-  if (!iv_data || !kid_data)
+  data = (guint8 *) g_bytes_get_data (self->iv_bytes, &iv_size);
+  if (!kid_data || !data)
     return FALSE;
+  memcpy (iv_data, data, (guint32) iv_size);
 
   for (i = 0; i < subsample_count * 2; i += 2) {
     guint32 n_bytes_clear = subsample_info[i];

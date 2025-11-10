@@ -172,6 +172,8 @@ gstisoff_dep = dependency('gstisoff', version : gst_req,
     fallback : ['gst-plugins-bad', 'gstisoff_dep'])
 gstbasedrm_dep = dependency('gstbasedrm', version : gst_req,
     fallback : ['gst-plugins-bad', 'gstbasedrm_dep'])
+gstapp_dep = dependency('gstreamer-app-1.0', version : gst_req,
+    fallback : ['gst-plugins-base', 'app_dep'])
 
 if host_machine.system() != 'windows'
   gstcheck_dep = dependency('gstreamer-check-1.0', version : gst_req,
@@ -303,8 +305,7 @@ gir_init_section = [ '--add-init-section=extern void gst_init(gint*,gchar**);' +
 presetdir = join_paths(get_option('datadir'), 'gstreamer-' + api_version, 'presets')
 subdir('gst-libs')
 subdir('gst')
-# FIXME: fix to support tests
-#subdir('tests')
+subdir('tests')
 
 python3 = import('python3').find_python()
 run_command(python3, '-c', 'import shutil; shutil.copy("hooks/pre-commit.hook", ".git/hooks/pre-commit")')

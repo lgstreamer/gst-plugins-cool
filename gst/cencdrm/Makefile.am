@@ -1,0 +1,8 @@
+if USE_PLAYREADY
+PLAYREADY_DIR=playready
+else
+PLAYREADY_DIR=
+endif
+
+SUBDIRS = marlin $(PLAYREADY_DIR) uhdcp
+DIS_SUBDIRS = marlin $(PLAYREADY_DIR) uhdcp

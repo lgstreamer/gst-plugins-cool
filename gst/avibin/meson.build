@@ -1,0 +1,10 @@
+gstavibin = library('gstavibin',
+  'gstavibin.c',
+  c_args : gst_plugins_cool_args,
+  include_directories : [libsinc],
+  version : libversion,
+  soversion : soversion,
+  install : true,
+  install_dir : plugins_install_dir,
+  dependencies : gstbase_dep,
+)

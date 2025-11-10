@@ -429,16 +429,6 @@ pkgconfig/gstreamer-cool.pc
 pkgconfig/gstreamer-cool-uninstalled.pc
 pkgconfig/gstreamer-dvrmpegts.pc
 pkgconfig/gstreamer-dvrmpegts-uninstalled.pc
-tests/Makefile
-tests/check/Makefile
-tests/examples/Makefile
-tests/examples/rm/Makefile
-tests/examples/mediainfo/Makefile
-tests/examples/textbin/Makefile
-tests/examples/dynappsrc/Makefile
-tests/examples/decproxy/Makefile
-tests/examples/splitappsink/Makefile
-tests/examples/mpegts/Makefile
 m4/Makefile
 scripts/registry/gst-registry.conf
 scripts/registry/gst-env.conf
